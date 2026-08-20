@@ -1,38 +1,45 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete
 from app.api.model import Chats
 from app.api.schema import CreateChat, UpdateContext
 
-def create_chat(db: Session, chat_info: CreateChat):
+async def create_chat(db: AsyncSession, chat_info: CreateChat) -> Chats:
     db_chat = Chats(**chat_info.model_dump()) # model_dump: turning objects ({...}) to allow class instances (**)
     db.add(db_chat)
-    db.commit()
-    db.refresh(db_chat)
+    await db.commit()
+    await db.refresh(db_chat)
     return db_chat
 
-def get_all_chats(db: Session):
-    return db.query(Chats).all()
+async def get_all_chats(db: AsyncSession) -> list[Chats]:
+    result = await db.execute(
+        select(Chats)
+    )
+    return list(result.scalars().all())
 
-def get_chat_by_id(db: Session, chat_id: int):
-    return db.query(Chats).filter(Chats.id == chat_id).first()
+async def get_chat_by_id(db: AsyncSession, chat_id: int) -> Chats | None:
+    return await db.get(Chats, chat_id)
 
-def update_context(db: Session, chat_context: UpdateContext, chat_id: int):
-    db_chat = get_chat_by_id(db, chat_id)
-    if not db_chat:
-        return None
+async def update_context(db: AsyncSession, updated_context: str , chat_id: int) -> Chats | None:
+    update_data = {
+        "chat_context": updated_context
+    }
 
-    update_data = chat_context.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_chat, key, value)
+    result = await db.execute((
+        update(Chats)
+        .where(Chats.id == chat_id)
+        .values(**update_data)
+        .returning(Chats)
+    ))
 
-    db.commit()
-    db.refresh(db_chat)
-    return db_chat
+    await db.commit()
+    return result.scalar_one_or_none() # converts tuple from postgresql to an object
 
-def delete_chat(db: Session, chat_id: int):
-    db_chat = get_chat_by_id(db, chat_id)
-    if not db_chat:
-        return None
+async def delete_chat(db: AsyncSession, chat_id: int) -> bool:
+    result = await db.execute((
+        delete(Chats)
+        .where(Chats.id == chat_id)
+        .returning(Chats.id)
+    ))
 
-    db.delete(db_chat)
-    db.commit()
-    return db_chat
+    await db.commit()
+    return result.scalar_one_or_none() is not None

@@ -1,20 +1,18 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import DeclarativeBase
 
-SQLALCHEMY_DATABASE_URL = 'postgresql://h3kar360:password@localhost:5430/fastai_db'
+SQLALCHEMY_DATABASE_URL = 'postgresql+asyncpg://h3kar360:password@localhost:5430/fastai_db'
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_async_engine(
+    SQLALCHEMY_DATABASE_URL,
+    echo=False
+)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+class Base(DeclarativeBase):
+    pass
 
-Base = declarative_base()
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
+async def get_db():
+    async with async_session() as session:
+        yield session

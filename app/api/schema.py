@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 class CreateChat(BaseModel):
     title: str
@@ -12,11 +13,12 @@ class ChatInput(BaseModel):
 class ChatResponse(BaseModel):
     id: int
     title: str
-    response: str
+    response: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ChatInfo(BaseModel):
     id: int
     title: str
+
+    model_config = ConfigDict(from_attributes=True)
