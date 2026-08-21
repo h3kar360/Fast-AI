@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import json
@@ -114,14 +114,14 @@ async def chat_to_llm(chat_id: int, chat_message: ChatInput, db: AsyncSession = 
                     messages.append({ "role": "tool", "tool_call_id": tool_call_id, "content": str_chunks })
 
 @router.post('/api/docs', response_model=DocsCreatedResponse)
-async def add_docs(doc_info: CreateDocs, db: AsyncSession = Depends(get_db)):
+async def add_docs(doc_info: CreateDocs, file: UploadFile, db: AsyncSession = Depends(get_db)):
+    contents = await file.read().decode()
+    text = contents.decode('utf-8', errors='ignore')
     # create new doc
     doc = await crud.create_doc(db, doc_info)
 
     # get the doc
-    dataset = []
-    with open('app/cat.txt', 'r') as file:
-        dataset = file.readlines()
+    dataset = [line.strip() for line in text.splits('\n') if line.strip()]
 
     # add chunks to embeddings
     for i, chunk in enumerate(dataset):
