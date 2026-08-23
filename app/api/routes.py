@@ -53,8 +53,8 @@ async def chat_to_llm(chat_id: int, chat_message: ChatInput, db: AsyncSession = 
                 {
                     "type": "function",
                     "function": {
-                        "name": "Search Cat Document",
-                        "description": "Searches internal knowledge base to retrieve relevant context about cats.",
+                        "name": "Search_Cat_Document",
+                        "description": "Searches internal knowledge base to retrieve relevant context about cats. Everything about cats must be searched through here.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -105,7 +105,7 @@ async def chat_to_llm(chat_id: int, chat_message: ChatInput, db: AsyncSession = 
                 tool_call_id = tool_call.id
                 function_arguments = json.loads(tool_call.function.arguments)
 
-                if function_name == 'Search Cat Document':
+                if function_name == 'Search_Cat_Document':
                     query = function_arguments['query']
                     chunks = await crud.retrieve_relevant_chunks(db, query)  
 
