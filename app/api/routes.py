@@ -1,14 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile, Form
+from fastapi import APIRouter, Depends, File, HTTPException, status, Response, UploadFile, Form
+from langchain_postgres import PGVector
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
+from langchain.messages import HumanMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import json
 
 from app.db import get_db
+from app.vector_store import get_vector_store
+from app.api.tools import search_documents
 from app.api import crud
 from app.api.schema import CreateChat, UpdateContext, ChatInfo, ChatInput, ChatResponse, CreateDocs, DocsCreatedResponse
 from app.config import client
 
 router = APIRouter()
+
+model = init_chat_model(model="google_genai:gemini-3.5-flash-lite")
+tools = [search_documents]
+SYSTEM_PROMPT = """
+You are an agent designed to retrieve the documents related to the queries being asked by the user. 
+You should refer to what is being retrieved from the documents and do not make stuff up.
+If you don't know the answer, then just say 'I don't know the answer to your question'.
+"""
+
+agent = create_agent(
+    model,
+    tools,
+    system_prompt=SYSTEM_PROMPT
+)
 
 @router.get('/api/chats', response_model=List[ChatInfo])
 async def get_all_chats(db: AsyncSession = Depends(get_db)):
@@ -142,3 +162,51 @@ async def delete_chat(chat_id: int, db: AsyncSession = Depends(get_db)):
         )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# =========SPECIALIZED ROUTES FOR LANGCHAIN USE==========
+
+"""
+# Plan:
+
+(CREATE: /langchain/docs/pdf)
+- Add PDF to PostgreSQL database 
+- Chunk the documents with splitter 
+- Embed it and save to PGVector
+
+(READ: /langchain/chat)
+- Allow normal chatting
+- Allow the use of RAG, all ochrestrated with tool calling and the use of create_agent
+- No memory
+
+(DELETE /langchain/docs/pdf) (Optional)
+- Delete the embeddings
+"""
+
+@router.post("/langchain/docs/pdf", response_model=DocsCreatedResponse)
+async def add_new_pdf(pdf_file: UploadFile = File(), title: str = Form(), vector_store: PGVector = Depends(get_vector_store), db: AsyncSession = Depends(get_db)):
+    doc_info = CreateDocs(title=title)
+    doc = await crud.create_doc(db, doc_info)
+
+    await crud.langchain_pdf_create_embeddings(vector_store, pdf_file, title)
+
+    return doc
+
+@router.get("/langchain/chat", response_model=ChatResponse)
+async def chat_langchain(message: str):
+    response = await agent.ainvoke(
+        {
+            "messages": [HumanMessage(content=message)]
+        }
+    )
+
+    response_msg = ""
+
+    for msg in response.get("messages", []):
+        if msg.text:
+            response_msg = msg.text
+
+    return ChatResponse(
+        id=1,
+        title="Capybara",
+        response=response_msg
+    )

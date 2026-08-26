@@ -1,7 +1,12 @@
+import os
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
+from dotenv import load_dotenv
 
-SQLALCHEMY_DATABASE_URL = 'postgresql+asyncpg://h3kar360:password@localhost:5430/fastai_db'
+load_dotenv()
+
+SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
 
 engine = create_async_engine(
     SQLALCHEMY_DATABASE_URL,
