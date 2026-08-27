@@ -10,12 +10,13 @@ async def search_documents(query: str) -> str:
     docs = await crud.langchain_retrieve(vector_store, query)
 
     if not docs:
-        return "Error: documents not found"
+        return "Documents not found"
 
     formatted_context = []
 
     for i, doc in enumerate(docs, 1):
         source = doc.metadata.get("source", "unknown")
-        formatted_context.append(f"--- Document Chunk {i} (Source: {source}) ---\n{doc.page_content}")
+        page = doc.metadata.get("page", "unknown")
+        formatted_context.append(f"--- Document Chunk {i} (Source: {source}, Page: {page}) ---\n{doc.page_content}")
 
     return "\n\n".join(formatted_context)

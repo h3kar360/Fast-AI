@@ -11,7 +11,7 @@ from app.db import get_db
 from app.vector_store import get_vector_store
 from app.api.tools import search_documents
 from app.api import crud
-from app.api.schema import CreateChat, UpdateContext, ChatInfo, ChatInput, ChatResponse, CreateDocs, DocsCreatedResponse
+from app.api.schema import CreateChat, UpdateContext, ChatInfo, ChatInput, ChatResponse, CreateDocs, DocsCreatedResponse, EmbeddingsCreatedResponse
 from app.config import client
 
 router = APIRouter()
@@ -22,6 +22,11 @@ SYSTEM_PROMPT = """
 You are an agent designed to retrieve the documents related to the queries being asked by the user. 
 You should refer to what is being retrieved from the documents and do not make stuff up.
 If you don't know the answer, then just say 'I don't know the answer to your question'.
+In your response you must list all the sources along with the pages you used if there are any.
+If the query is not in the retrieved documents then don't state the source or page number.
+In your response, format it as:
+{response}
+[Source: filename, Page 3, ...]
 """
 
 agent = create_agent(
@@ -182,14 +187,18 @@ async def delete_chat(chat_id: int, db: AsyncSession = Depends(get_db)):
 - Delete the embeddings
 """
 
-@router.post("/langchain/docs/pdf", response_model=DocsCreatedResponse)
+@router.post("/langchain/docs/pdf", response_model=EmbeddingsCreatedResponse)
 async def add_new_pdf(pdf_file: UploadFile = File(), title: str = Form(), vector_store: PGVector = Depends(get_vector_store), db: AsyncSession = Depends(get_db)):
     doc_info = CreateDocs(title=title)
     doc = await crud.create_doc(db, doc_info)
 
-    await crud.langchain_pdf_create_embeddings(vector_store, pdf_file, title)
+    embedding_ids = await crud.langchain_pdf_create_embeddings(vector_store, pdf_file, title)
 
-    return doc
+    return EmbeddingsCreatedResponse(
+        doc_id=doc.id,
+        title=doc.title,
+        embedding_ids=embedding_ids
+    )
 
 @router.get("/langchain/chat", response_model=ChatResponse)
 async def chat_langchain(message: str):
@@ -210,3 +219,8 @@ async def chat_langchain(message: str):
         title="Capybara",
         response=response_msg
     )
+
+@router.delete('/langchain/docs/pdf', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pdf_embeddings(vector_store_ids: list[str], vector_store: PGVector = Depends(get_vector_store)):
+    await crud.langchain_delete_embeddings(vector_store, vector_store_ids)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

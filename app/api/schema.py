@@ -35,4 +35,11 @@ class DocsCreatedResponse(BaseModel):
     title: str
 
     model_config = ConfigDict(from_attributes=True)
+
+# ---LangChain---
+
+class EmbeddingsCreatedResponse(BaseModel):
+    doc_id: int
+    title: str
+    embedding_ids: list[str]
     

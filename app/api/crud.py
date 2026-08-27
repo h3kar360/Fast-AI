@@ -1,6 +1,7 @@
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
+from app import vector_store
 from app.api.model import Chats, Documents, Embeddings
 from app.api.schema import CreateChat, CreateDocs
 from app.config import client
@@ -11,7 +12,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_postgres import PGVector
 
 import pypdf
-from io import BytesIO
 
 load_dotenv()
 
@@ -144,7 +144,7 @@ def load_pdf_docs(pdf_file: UploadFile, title: str) -> list[Document]:
     return [
         Document(
             page_content=page.extract_text(),
-            metadata={ "source": title, "page": i}
+            metadata={ "source": title, "page": i+1}
         )
         for i, page in enumerate(reader.pages)
     ]
@@ -170,3 +170,8 @@ async def langchain_pdf_create_embeddings(vector_store: PGVector, pdf_file: Uplo
 # Read
 async def langchain_retrieve(vector_store: PGVector, query: str) -> list[Document]:
     return await vector_store.asimilarity_search(query, k=3)
+
+# Delete
+async def langchain_delete_embeddings(vector_store: PGVector, vector_store_ids: list[str]):
+    await vector_store.adelete(vector_store_ids)
+    
