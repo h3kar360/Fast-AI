@@ -28,3 +28,4 @@ async def root():
     return {"message": "Hello World"}
 
 print('yo!')
+print('main stuff')
